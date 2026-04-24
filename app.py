@@ -66,18 +66,21 @@ st.title("📧 Generador de Base de Datos Email Marketing")
 st.caption("Sube las 3 bases exportadas desde Odoo para generar tu lista de email marketing.")
 
 st.subheader("1. Base de Pedidos Odoo")
+st.caption("Filtro en Odoo: part number de la marca + estado = pedido de venta")
 st.caption("Columnas requeridas: `Fecha creación`, `Cliente`")
 file1 = st.file_uploader("Subir Base 1", type=["xlsx", "csv"], key="b1")
 
 st.divider()
 
 st.subheader("2. Base de Empresas")
+st.caption("Filtro en Odoo: Compañía relacionada - No está establecida")
 st.caption("Columnas requeridas: `Nombre`, `Nombre mostrado`, `Correo electrónico`")
 file2 = st.file_uploader("Subir Base 2", type=["xlsx", "csv"], key="b2")
 
 st.divider()
 
 st.subheader("3. Base de Contactos Internos")
+st.caption("Filtro en Odoo: Compañía relacionada - Está establecida")
 st.caption("Columnas requeridas: `Nombre`, `Compañía relacionada`, `Correo electrónico`")
 file3 = st.file_uploader("Subir Base 3", type=["xlsx", "csv"], key="b3")
 
