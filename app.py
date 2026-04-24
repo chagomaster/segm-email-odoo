@@ -55,9 +55,9 @@ def validate_columns(df, required_cols, label):
 
 # ─── Columnas esperadas ────────────────────────────────────────────────────────
 
-B1_COLS = ["fecha_pedido", "nombre_cliente"]
-B2_COLS = ["nombre_empresa_1", "nombre_empresa_2", "email"]
-B3_COLS = ["nombre_contacto", "nombre_empresa", "email"]
+B1_COLS = ["Fecha creación", "Cliente"]
+B2_COLS = ["Nombre", "Nombre mostrado", "Correo electrónico"]
+B3_COLS = ["Nombre", "Compañía relacionada", "Correo electrónico"]
 
 
 # ─── UI ───────────────────────────────────────────────────────────────────────
@@ -66,19 +66,19 @@ st.title("📧 Generador de Base de Datos Email Marketing")
 st.caption("Sube las 3 bases exportadas desde Odoo para generar tu lista de email marketing.")
 
 st.subheader("1. Base de Pedidos Odoo")
-st.caption("Columnas requeridas: `fecha_pedido`, `nombre_cliente`")
+st.caption("Columnas requeridas: `Fecha creación`, `Cliente`")
 file1 = st.file_uploader("Subir Base 1", type=["xlsx", "csv"], key="b1")
 
 st.divider()
 
 st.subheader("2. Base de Empresas")
-st.caption("Columnas requeridas: `nombre_empresa_1`, `nombre_empresa_2`, `email`")
+st.caption("Columnas requeridas: `Nombre`, `Nombre mostrado`, `Correo electrónico`")
 file2 = st.file_uploader("Subir Base 2", type=["xlsx", "csv"], key="b2")
 
 st.divider()
 
 st.subheader("3. Base de Contactos Internos")
-st.caption("Columnas requeridas: `nombre_contacto`, `nombre_empresa`, `email`")
+st.caption("Columnas requeridas: `Nombre`, `Compañía relacionada`, `Correo electrónico`")
 file3 = st.file_uploader("Subir Base 3", type=["xlsx", "csv"], key="b3")
 
 st.divider()
@@ -121,11 +121,11 @@ else:
             # ── 1. Empresas únicas de Base 1 ──────────────────────────────────
             companies_keys = {
                 k
-                for k in (norm_key(v) for v in df1["nombre_cliente"].dropna())
+                for k in (norm_key(v) for v in df1["Cliente"].dropna())
                 if k is not None
             }
             display_map = {}
-            for v in df1["nombre_cliente"].dropna():
+            for v in df1["Cliente"].dropna():
                 k = norm_key(v)
                 if k and k not in display_map:
                     display_map[k] = clean_str(v)
@@ -133,15 +133,15 @@ else:
 
             # ── 2. Filtrar Base 2 a empresas de Base 1 ────────────────────────
             df2 = df2.copy()
-            df2["_key"] = df2["nombre_empresa_2"].apply(norm_key)
-            df2["_email"] = df2["email"].apply(norm_email)
+            df2["_key"] = df2["Nombre mostrado"].apply(norm_key)
+            df2["_email"] = df2["Correo electrónico"].apply(norm_email)
             df2_f = df2[df2["_key"].isin(companies_keys)].copy()
 
             # ── 3. Filtrar Base 3 usando claves canónicas de Base 2 ───────────
             canonical_keys = set(df2_f["_key"].dropna())
             df3 = df3.copy()
-            df3["_company_key"] = df3["nombre_empresa"].apply(norm_key)
-            df3["_email"] = df3["email"].apply(norm_email)
+            df3["_company_key"] = df3["Compañía relacionada"].apply(norm_key)
+            df3["_email"] = df3["Correo electrónico"].apply(norm_email)
             df3_f = df3[df3["_company_key"].isin(canonical_keys)].copy()
 
             # ── 4. Estadísticas ───────────────────────────────────────────────
@@ -160,15 +160,15 @@ else:
             # ── 5. Construir Excel de salida ──────────────────────────────────
             b3_valid = df3_f[df3_f["_email"].notna()].copy()
             b3_rows = pd.DataFrame({
-                "name": b3_valid["nombre_contacto"].apply(clean_str),
-                "company name": b3_valid["nombre_empresa"].apply(clean_str),
+                "name": b3_valid["Nombre"].apply(clean_str),
+                "company name": b3_valid["Compañía relacionada"].apply(clean_str),
                 "email": b3_valid["_email"],
             })
 
             b2_valid = df2_f[df2_f["_email"].notna()].copy()
             b2_rows = pd.DataFrame({
-                "name": b2_valid["nombre_empresa_2"].apply(clean_str),
-                "company name": b2_valid["nombre_empresa_2"].apply(clean_str),
+                "name": b2_valid["Nombre mostrado"].apply(clean_str),
+                "company name": b2_valid["Nombre mostrado"].apply(clean_str),
                 "email": b2_valid["_email"],
             })
 
