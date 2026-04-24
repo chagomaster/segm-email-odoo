@@ -192,11 +192,16 @@ else:
             df_comp["_email"] = df_comp[comp_email_col].apply(norm_email)
             df_comp_f = df_comp[df_comp["_key"].isin(companies_keys)].copy()
 
-            # ── 3. Filter contacts DB ──────────────────────────────────────────
+            # ── 3. Filter contacts DB using Base 2 company names as reference ──
+            # Base 2 and Base 3 share the same company name format (both from
+            # Odoo Contacts), so we match contacts against Base 2 names, not
+            # against sales names which may differ.
+            canonical_keys = set(df_comp_f["_key"].dropna())
+
             df_cont = df_contacts.copy()
             df_cont["_company_key"] = df_cont[cont_company_col].apply(norm_key)
             df_cont["_email"] = df_cont[cont_email_col].apply(norm_email)
-            df_cont_f = df_cont[df_cont["_company_key"].isin(companies_keys)].copy()
+            df_cont_f = df_cont[df_cont["_company_key"].isin(canonical_keys)].copy()
 
             # ── 4. Stats ───────────────────────────────────────────────────────
             comp_with_own_email = set(
