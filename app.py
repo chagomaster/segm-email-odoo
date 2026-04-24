@@ -232,7 +232,7 @@ with tab2:
     st.divider()
 
     st.subheader("2. Base de Cotizaciones Odoo")
-    st.caption("Filtro en Odoo: part number de la marca + estado = presupuesto / presupuesto enviado")
+    st.caption("Filtro en Odoo: part number de la marca")
     st.caption("Columnas requeridas: `Fecha creación`, `Cliente`")
     t2_file2 = st.file_uploader("Subir Base 2", type=["xlsx", "csv"], key="t2_b2")
 
