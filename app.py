@@ -144,11 +144,93 @@ def process_and_show(companies_keys, display_map, df_emp, df_cont):
 PEDIDOS_COLS = ["Fecha creación", "Cliente"]
 EMPRESAS_COLS = ["Nombre", "Nombre mostrado", "Correo electrónico"]
 CONTACTOS_COLS = ["Nombre", "Compañía relacionada", "Correo electrónico"]
+TALLER_EMPRESAS_COLS = ["Nombre", "Nombre mostrado", "Teléfono", "Móvil", "Correo electrónico"]
+TALLER_CONTACTOS_COLS = ["Nombre", "Compañía relacionada", "Teléfono", "Móvil", "Correo electrónico"]
+
+
+def process_taller(companies_keys, display_map, df_emp, df_cont):
+    """Construye Excel con empresas y contactos internos incluyendo teléfono, móvil y correo."""
+    # Filtrar empresas
+    df_emp = df_emp.copy()
+    df_emp["_key"] = df_emp["Nombre mostrado"].apply(norm_key)
+    df_emp_f = df_emp[df_emp["_key"].isin(companies_keys)].copy()
+
+    # Filtrar contactos usando las claves canónicas de las empresas encontradas
+    canonical_keys = set(df_emp_f["_key"].dropna())
+    df_cont = df_cont.copy()
+    df_cont["_company_key"] = df_cont["Compañía relacionada"].apply(norm_key)
+    df_cont_f = df_cont[df_cont["_company_key"].isin(canonical_keys)].copy()
+
+    # Filas de empresas
+    emp_rows = pd.DataFrame({
+        "Nombre": df_emp_f["Nombre mostrado"].apply(clean_str),
+        "Compañía relacionada": "",
+        "Teléfono": df_emp_f["Teléfono"].apply(clean_str),
+        "Móvil": df_emp_f["Móvil"].apply(clean_str),
+        "Correo electrónico": df_emp_f["Correo electrónico"].apply(clean_str),
+        "_sort_key": df_emp_f["Nombre mostrado"].apply(
+            lambda v: str(v).strip().lower() if pd.notna(v) else ""
+        ),
+        "_is_company": True,
+    })
+
+    # Filas de contactos internos
+    cont_rows = pd.DataFrame({
+        "Nombre": df_cont_f["Nombre"].apply(clean_str),
+        "Compañía relacionada": df_cont_f["Compañía relacionada"].apply(clean_str),
+        "Teléfono": df_cont_f["Teléfono"].apply(clean_str),
+        "Móvil": df_cont_f["Móvil"].apply(clean_str),
+        "Correo electrónico": df_cont_f["Correo electrónico"].apply(clean_str),
+        "_sort_key": df_cont_f["Compañía relacionada"].apply(
+            lambda v: str(v).strip().lower() if pd.notna(v) else ""
+        ),
+        "_is_company": False,
+    })
+
+    combined = pd.concat([emp_rows, cont_rows], ignore_index=True)
+    # Ordenar: primero por empresa (alfabético), luego empresa antes que sus contactos
+    combined = combined.sort_values(
+        ["_sort_key", "_is_company"], ascending=[True, False]
+    ).reset_index(drop=True)
+    combined = combined.drop(columns=["_sort_key", "_is_company"])
+
+    # Estadísticas
+    found_in_emp = set(df_emp_f["_key"])
+    missing = companies_keys - found_in_emp
+
+    st.success("✅ Proceso completado")
+    st.markdown("---")
+    st.markdown("### 📊 Resumen")
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Empresas encontradas", len(df_emp_f))
+    m2.metric("Contactos internos", len(df_cont_f))
+    m3.metric("Total filas en Excel", len(combined))
+
+    if missing:
+        with st.expander(f"⚠️ {len(missing)} empresa(s) no encontradas en la base de empresas"):
+            st.write(sorted(display_map.get(k, k) for k in missing))
+
+    st.markdown("### 📋 Vista previa del Excel")
+    st.dataframe(combined, use_container_width=True)
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+        combined.to_excel(writer, index=False, sheet_name="Taller")
+    output.seek(0)
+
+    st.download_button(
+        label="⬇️ Descargar Excel",
+        data=output,
+        file_name="taller_contactos.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
 
 
 # ─── Pestañas ─────────────────────────────────────────────────────────────────
 
-tab1, tab2 = st.tabs(["🛒 Compraron", "📋 Cotizaron"])
+tab1, tab2, tab3 = st.tabs(["🛒 Compraron", "📋 Cotizaron", "🔧 Taller"])
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -314,3 +396,71 @@ with tab2:
                         f"Resultado: **{len(companies_keys)}** empresas"
                     )
                     process_and_show(companies_keys, display_map, t2_df3, t2_df4)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# TAB 3 — TALLER
+# ══════════════════════════════════════════════════════════════════════════════
+
+with tab3:
+    st.subheader("1. Base de Compras de la Marca")
+    st.caption("Filtro en Odoo: part number de la marca + estado = pedido de venta")
+    st.caption("Columnas requeridas: `Fecha creación`, `Cliente`")
+    t3_file1 = st.file_uploader("Subir Base 1", type=["xlsx", "csv"], key="t3_b1")
+
+    st.divider()
+
+    st.subheader("2. Base de Empresas")
+    st.caption("Filtro en Odoo: Compañía relacionada - No está establecida")
+    st.caption("Columnas requeridas: `Nombre`, `Nombre mostrado`, `Teléfono`, `Móvil`, `Correo electrónico`")
+    t3_file2 = st.file_uploader("Subir Base 2", type=["xlsx", "csv"], key="t3_b2")
+
+    st.divider()
+
+    st.subheader("3. Base de Contactos Internos")
+    st.caption("Filtro en Odoo: Compañía relacionada - Está establecida")
+    st.caption("Columnas requeridas: `Nombre`, `Compañía relacionada`, `Teléfono`, `Móvil`, `Correo electrónico`")
+    t3_file3 = st.file_uploader("Subir Base 3", type=["xlsx", "csv"], key="t3_b3")
+
+    st.divider()
+
+    t3_df1 = t3_df2 = t3_df3 = None
+    t3_ok1 = t3_ok2 = t3_ok3 = False
+
+    if t3_file1:
+        try:
+            t3_df1 = read_file(t3_file1)
+            t3_ok1 = validate_columns(t3_df1, PEDIDOS_COLS, "Base 1")
+        except Exception as e:
+            st.error(f"Error al leer Base 1: {e}")
+
+    if t3_file2:
+        try:
+            t3_df2 = read_file(t3_file2)
+            t3_ok2 = validate_columns(t3_df2, TALLER_EMPRESAS_COLS, "Base 2")
+        except Exception as e:
+            st.error(f"Error al leer Base 2: {e}")
+
+    if t3_file3:
+        try:
+            t3_df3 = read_file(t3_file3)
+            t3_ok3 = validate_columns(t3_df3, TALLER_CONTACTOS_COLS, "Base 3")
+        except Exception as e:
+            st.error(f"Error al leer Base 3: {e}")
+
+    if not (t3_ok1 and t3_ok2 and t3_ok3):
+        st.info("Sube las 3 bases con las columnas correctas para habilitar el procesamiento.")
+    else:
+        if st.button("🚀 Procesar", type="primary", use_container_width=True, key="t3_run"):
+            with st.spinner("Procesando..."):
+                companies_keys = {
+                    k for k in (norm_key(v) for v in t3_df1["Cliente"].dropna())
+                    if k is not None
+                }
+                display_map = {}
+                for v in t3_df1["Cliente"].dropna():
+                    k = norm_key(v)
+                    if k and k not in display_map:
+                        display_map[k] = clean_str(v)
+
+                process_taller(companies_keys, display_map, t3_df2, t3_df3)
