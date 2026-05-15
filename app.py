@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
-from openpyxl.styles import PatternFill
+import math
+from openpyxl.styles import PatternFill, Border, Side, Alignment
 
 st.set_page_config(
     page_title="Email Marketing DB | Odoo",
@@ -233,14 +234,48 @@ def process_taller(companies_keys, display_map, df_emp, df_cont):
     WHITE_FILL = PatternFill(fill_type="solid", fgColor="FFFFFF")
     GRAY_FILL  = PatternFill(fill_type="solid", fgColor="D9D9D9")
 
+    thin = Side(border_style="thin", color="000000")
+    thin_border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+    # Anchos de columna (en unidades de carácter) — suman ~130, justo para A4 horizontal
+    COL_WIDTHS = [35, 35, 15, 15, 30]
+    LINE_HEIGHT_PT = 15  # puntos por línea de texto
+
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         export_df.to_excel(writer, index=False, sheet_name="Taller")
         ws = writer.sheets["Taller"]
+
+        # Anchos de columna
+        for col_idx, width in enumerate(COL_WIDTHS, start=1):
+            ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = width
+
+        # Bordes, ajuste de texto y altura de fila automática
+        for row_idx in range(1, len(export_df) + 2):
+            max_lines = 1
+            for col_idx, col_w in enumerate(COL_WIDTHS, start=1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.border = thin_border
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
+                if row_idx >= 2:
+                    text = str(cell.value) if cell.value else ""
+                    lines = max(1, math.ceil(len(text) / col_w)) if text else 1
+                    max_lines = max(max_lines, lines)
+            if row_idx >= 2:
+                ws.row_dimensions[row_idx].height = max_lines * LINE_HEIGHT_PT
+
+        # Colores de fila alternados por empresa
         for row_idx, group in enumerate(combined["_group"], start=2):
             fill = WHITE_FILL if group == 0 else GRAY_FILL
             for col_idx in range(1, len(export_df.columns) + 1):
                 ws.cell(row=row_idx, column=col_idx).fill = fill
+
+        # Configuración de página para exportar PDF en A4 horizontal ajustado al ancho
+        ws.page_setup.orientation = "landscape"
+        ws.page_setup.paperSize = 9  # A4
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
     output.seek(0)
 
     st.download_button(
