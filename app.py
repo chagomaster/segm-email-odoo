@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 import math
-from openpyxl.styles import PatternFill, Border, Side, Alignment
+from openpyxl.styles import PatternFill, Border, Side, Alignment, Font
 
 st.set_page_config(
     page_title="Email Marketing DB | Odoo",
@@ -257,6 +257,8 @@ def process_taller(companies_keys, display_map, df_emp, df_cont):
                 cell = ws.cell(row=row_idx, column=col_idx)
                 cell.border = thin_border
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
+                if row_idx == 1:
+                    cell.font = Font(bold=True)
                 if row_idx >= 2:
                     text = str(cell.value) if cell.value else ""
                     lines = max(1, math.ceil(len(text) / col_w)) if text else 1
