@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from io import BytesIO
+from openpyxl.styles import PatternFill
 
 st.set_page_config(
     page_title="Email Marketing DB | Odoo",
@@ -192,7 +193,20 @@ def process_taller(companies_keys, display_map, df_emp, df_cont):
     combined = combined.sort_values(
         ["_sort_key", "_is_company"], ascending=[True, False]
     ).reset_index(drop=True)
-    combined = combined.drop(columns=["_sort_key", "_is_company"])
+    combined = combined.drop(columns=["_is_company"])
+
+    # Asignar grupo alternado por empresa (para colorear filas)
+    group_idx = 0
+    prev_key = None
+    groups = []
+    for key in combined["_sort_key"]:
+        if key != prev_key:
+            if prev_key is not None:
+                group_idx += 1
+            prev_key = key
+        groups.append(group_idx % 2)
+    combined["_group"] = groups
+    combined = combined.drop(columns=["_sort_key"])
 
     # Estadísticas
     found_in_emp = set(df_emp_f["_key"])
@@ -211,12 +225,22 @@ def process_taller(companies_keys, display_map, df_emp, df_cont):
         with st.expander(f"⚠️ {len(missing)} empresa(s) no encontradas en la base de empresas"):
             st.write(sorted(display_map.get(k, k) for k in missing))
 
+    export_df = combined.drop(columns=["_group"])
+
     st.markdown("### 📋 Vista previa del Excel")
-    st.dataframe(combined, use_container_width=True)
+    st.dataframe(export_df, use_container_width=True)
+
+    WHITE_FILL = PatternFill(fill_type="solid", fgColor="FFFFFF")
+    GRAY_FILL  = PatternFill(fill_type="solid", fgColor="D9D9D9")
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        combined.to_excel(writer, index=False, sheet_name="Taller")
+        export_df.to_excel(writer, index=False, sheet_name="Taller")
+        ws = writer.sheets["Taller"]
+        for row_idx, group in enumerate(combined["_group"], start=2):
+            fill = WHITE_FILL if group == 0 else GRAY_FILL
+            for col_idx in range(1, len(export_df.columns) + 1):
+                ws.cell(row=row_idx, column=col_idx).fill = fill
     output.seek(0)
 
     st.download_button(
